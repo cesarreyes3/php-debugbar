@@ -30,6 +30,9 @@ class MessagesCollector extends AbstractLogger implements DataCollectorInterface
     /** @var bool */
     protected $collectFile = false;
 
+    /** @var int */
+    protected $stacktraceLimit = 5;
+
     /**
      * @param string $name
      */
@@ -42,6 +45,16 @@ class MessagesCollector extends AbstractLogger implements DataCollectorInterface
     public function collectFileTrace($enabled = true)
     {
         $this->collectFile = $enabled;
+    }
+
+    /**
+     * @param int $limit
+     *
+     * @return void
+     */
+    public function limitFileTrace($limit)
+    {
+        $this->stacktraceLimit = $limit;
     }
 
     /**
@@ -58,6 +71,25 @@ class MessagesCollector extends AbstractLogger implements DataCollectorInterface
         }
 
         return $messageHtml;
+    }
+
+    /**
+     * @param array $stacktrace
+     *
+     * @return array
+     */
+    protected function getStackTraceItem($stacktrace)
+    {
+        $stackItem = $stacktrace[0];
+        foreach ($stacktrace as $trace) {
+            if (!isset($trace['file']) || strpos(str_replace('\\', '/', $trace['file']), '/vendor/') !== false) {
+                continue;
+            }
+
+            return $trace;
+        }
+
+        return $stackItem;
     }
 
     /**
@@ -83,16 +115,7 @@ class MessagesCollector extends AbstractLogger implements DataCollectorInterface
 
         $stackItem = [];
         if ($this->collectFile) {
-            $stacktrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5);
-            $stackItem = $stacktrace[0];
-            foreach ($stacktrace as $trace) {
-                if (!isset($trace['file']) || strpos($trace['file'], '/vendor/') !== false) {
-                    continue;
-                }
-
-                $stackItem = $trace;
-                break;
-            }
+            $stackItem = $this->getStackTraceItem(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, $this->stacktraceLimit));
         }
 
         $this->messages[] = array(
